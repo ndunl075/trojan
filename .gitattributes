@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+# Fixtures deliberately contain exotic bytes, invisible unicode and CRLF
+# tricks. Git must not normalise them or the detection tests become
+# meaningless.
+test/fixtures/** -text -diff
