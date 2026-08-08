@@ -2,6 +2,7 @@
   "exclude": [
     "src/rules/**",
     "test/**",
+    "scripts/stress.js",
     "README.md",
     "docs/**"
   ],

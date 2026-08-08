@@ -58,6 +58,8 @@ const SNIPPET_LIMIT = 160;
 const CONTEXT_LIMIT = 200;
 /** How many distinct rule families a file must trip before severity is raised. */
 const CORRELATION_THRESHOLD = 3;
+/** Upper bound on matches of a single rule in a single file. */
+const MAX_FINDINGS_PER_RULE = 50;
 
 export async function scan(target: string, options: ScanOptions = {}): Promise<ScanResult> {
   const started = Date.now();
@@ -112,6 +114,7 @@ export async function scan(target: string, options: ScanOptions = {}): Promise<S
         minRank,
         noBoost: options.noBoost ?? false,
         suppressedOut: suppressed,
+        errorsOut: errors,
       });
       findings.push(...fileFindings);
     }
@@ -148,6 +151,8 @@ interface ScanTextContext {
   minRank: number;
   noBoost: boolean;
   suppressedOut: Finding[];
+  /** Rule crashes are appended here so a failed detector is never silent. */
+  errorsOut?: { file: string; message: string }[];
 }
 
 /**
@@ -190,11 +195,31 @@ export function scanText(
     let produced: RawFinding[];
     try {
       produced = rule.scan(ctx);
-    } catch {
-      // A rule throwing must never take the scan down with it. Skipping one
-      // detector is a far better outcome than reporting nothing at all.
+    } catch (error) {
+      // A rule throwing must not take the whole scan down. But it must never
+      // be silent either: a swallowed crash turns "this detector failed" into
+      // "nothing found here", which is a free way for a crafted file to
+      // disable a detector. Surface it as a scan error instead.
+      options.errorsOut?.push({
+        file: posixPath,
+        message: `rule ${rule.id} failed on this file, so it was not checked by that rule: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
       continue;
     }
+    // A file can be built to produce thousands of matches of one rule -- a
+    // long line of homoglyphs, say. Past a few dozen the report is unreadable
+    // and the remaining matches tell the reader nothing new, so cap it and say
+    // so rather than spending the time.
+    if (produced.length > MAX_FINDINGS_PER_RULE) {
+      options.errorsOut?.push({
+        file: posixPath,
+        message: `rule ${rule.id} matched ${produced.length} times; only the first ${MAX_FINDINGS_PER_RULE} are reported.`,
+      });
+      produced = produced.slice(0, MAX_FINDINGS_PER_RULE);
+    }
+
     for (const finding of produced) raw.push({ rule, finding });
   }
 
@@ -232,8 +257,12 @@ export function scanText(
       }
     }
 
-    const snippet = truncate(visualize(finding.match), SNIPPET_LIMIT);
-    const context = truncate(visualize(lineIndex.lineAt(finding.index).trim()), CONTEXT_LIMIT);
+    // Bound the raw text before expanding it. `visualize` can grow a string
+    // sixfold, and the line it sits on may be megabytes long.
+    const rawSnippet = finding.match.slice(0, SNIPPET_LIMIT);
+    const rawContext = lineIndex.lineWindow(finding.index, CONTEXT_LIMIT).trim();
+    const snippet = truncate(visualize(rawSnippet), SNIPPET_LIMIT);
+    const context = truncate(visualize(rawContext), CONTEXT_LIMIT);
 
     const resolved: Finding = {
       ruleId: rule.id,

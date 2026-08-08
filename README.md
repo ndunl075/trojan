@@ -1,10 +1,18 @@
-# trojan
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ndunl075/trojan/main/assets/trojan-mascot.png" alt="Trojan's blue 8-bit horse mascot" width="220">
+</p>
 
-**Find prompt injections aimed at your AI coding agent — before the agent reads them.**
+<h1 align="center">trojan</h1>
 
-[![CI](https://github.com/ndunl075/trojan/actions/workflows/ci.yml/badge.svg)](https://github.com/ndunl075/trojan/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/trojan-scan.svg)](https://www.npmjs.com/package/trojan-scan)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>Find prompt injections aimed at your AI coding agent — before the agent reads them.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ndunl075/trojan/actions/workflows/ci.yml"><img src="https://github.com/ndunl075/trojan/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/trojan-scan"><img src="https://img.shields.io/npm/v/trojan-scan.svg" alt="npm"></a>
+  <a href="https://github.com/ndunl075/trojan/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+</p>
 
 ```
 npx trojan-scan .

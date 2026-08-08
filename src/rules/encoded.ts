@@ -54,6 +54,19 @@ function decodeBase64(candidate: string): string | null {
   }
 }
 
+/**
+ * String.fromCodePoint throws on anything above U+10FFFF, and an escape
+ * sequence in a scanned file is attacker-controlled. A thrown decoder would
+ * take this rule down for the whole file -- which is a free way to disable the
+ * detector -- so out-of-range escapes decode to nothing instead.
+ */
+function safeFromCodePoint(value: number): string {
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return '';
+  // Lone surrogates are valid input to fromCodePoint but produce broken text.
+  if (value >= 0xd800 && value <= 0xdfff) return '';
+  return String.fromCodePoint(value);
+}
+
 function truncate(text: string, limit = 160): string {
   const flat = text.replace(/\s+/g, ' ').trim();
   return flat.length > limit ? `${flat.slice(0, limit)}...` : flat;
@@ -150,7 +163,7 @@ export const escapedPayload: Rule = {
         re: /(?:\\u\{?[0-9a-fA-F]{2,6}\}?){8,}/g,
         decode: (raw) =>
           (raw.match(/\\u\{?([0-9a-fA-F]{2,6})\}?/g) ?? [])
-            .map((piece) => String.fromCodePoint(parseInt(piece.replace(/\\u\{?|\}/g, ''), 16)))
+            .map((piece) => safeFromCodePoint(parseInt(piece.replace(/\\u\{?|\}/g, ''), 16)))
             .join(''),
         label: 'unicode escapes',
       },

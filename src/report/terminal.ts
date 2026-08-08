@@ -139,23 +139,34 @@ function summary(result: ScanResult, painter: Painter): string[] {
 }
 
 function footer(result: ScanResult, options: TerminalOptions): string[] {
-  if (options.quiet) return [];
   const { painter } = options;
   const out: string[] = [];
 
-  const suppressed = options.showSuppressedCount ?? 0;
-  const suppressedNote = suppressed > 0 ? `, ${suppressed} suppressed` : '';
+  if (!options.quiet) {
+    const suppressed = options.showSuppressedCount ?? 0;
+    const suppressedNote = suppressed > 0 ? `, ${suppressed} suppressed` : '';
 
-  out.push(
-    painter.dim(
-      `  ${result.stats.filesScanned} files scanned, ${result.stats.filesSkipped} skipped${suppressedNote} in ${result.stats.durationMs}ms`,
-    ),
-  );
+    out.push(
+      painter.dim(
+        `  ${result.stats.filesScanned} files scanned, ${result.stats.filesSkipped} skipped${suppressedNote} in ${result.stats.durationMs}ms`,
+      ),
+    );
+  }
 
+  // Errors print even in quiet mode. Every one of them means some part of the
+  // repository went unchecked, and a security tool that hides reduced coverage
+  // is worse than one that reports nothing at all.
   if (result.errors.length > 0) {
-    out.push(painter.dim(`  ${result.errors.length} file(s) could not be read:`));
+    out.push(
+      painter.yellow(
+        `  ${result.errors.length} file(s) were not fully scanned:`,
+      ),
+    );
     for (const error of result.errors.slice(0, 5)) {
       out.push(painter.dim(`    ${error.file}: ${error.message}`));
+    }
+    if (result.errors.length > 5) {
+      out.push(painter.dim(`    ...and ${result.errors.length - 5} more`));
     }
   }
 
