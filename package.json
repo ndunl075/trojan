@@ -1,0 +1,67 @@
+{
+  "name": "trojan-scan",
+  "version": "0.1.0",
+  "description": "Local CLI that scans repos for hidden prompt injections targeting AI coding agents, before your agent reads them.",
+  "keywords": [
+    "prompt-injection",
+    "security",
+    "static-analysis",
+    "ai-agents",
+    "llm",
+    "supply-chain",
+    "unicode",
+    "trojan-source",
+    "claude-code",
+    "cursor",
+    "codex",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "Nicolas Dunlap",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ndunl075/trojan.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ndunl075/trojan/issues"
+  },
+  "homepage": "https://github.com/ndunl075/trojan#readme",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "trojan": "./dist/cli.js",
+    "trojan-scan": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"for (const d of ['dist','.test-build']) require('fs').rmSync(d,{recursive:true,force:true})\"",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
+    "pretest": "tsc -p tsconfig.test.json",
+    "test": "node --test .test-build/test/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {},
+  "publishConfig": {
+    "access": "public"
+  }
+}
