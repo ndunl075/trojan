@@ -138,16 +138,47 @@ export function toPosix(p: string): string {
 }
 
 /**
- * Heuristic binary check: a NUL byte in the first 8 KiB. This is what git
- * itself does, and it is far cheaper and more reliable than sniffing magic
- * numbers for every format under the sun.
+ * Heuristic binary check, by density rather than by first occurrence.
+ *
+ * Git treats a single NUL in the first 8 KiB as proof of a binary file. For a
+ * security scanner that rule is an evasion vector: one NUL byte pasted into a
+ * README makes the whole file disappear from the scan. So instead we ask
+ * whether the file *looks* like binary data -- real binaries are dense with
+ * NULs and control bytes, while a text file carrying a planted one is not.
  */
 export function looksBinary(buffer: Buffer): boolean {
   const limit = Math.min(buffer.length, 8192);
+  if (limit === 0) return false;
+
+  let nulls = 0;
+  let controls = 0;
+
   for (let i = 0; i < limit; i += 1) {
-    if (buffer[i] === 0) return true;
+    const byte = buffer[i] as number;
+    if (byte === 0) nulls += 1;
+    // C0 controls other than tab, newline and carriage return.
+    else if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) controls += 1;
   }
-  return false;
+
+  // Thresholds sit far from both cases: a real binary is typically tens of
+  // percent NUL, and a text file with a handful of planted control bytes is
+  // a fraction of one percent.
+  return nulls / limit > 0.02 || (nulls + controls) / limit > 0.1;
+}
+
+/**
+ * Control bytes that have no business in a text file. Reported separately,
+ * because a text file containing them is either corrupt or is trying to
+ * terminate a parser early.
+ */
+export function countControlBytes(buffer: Buffer): number {
+  const limit = Math.min(buffer.length, 8192);
+  let count = 0;
+  for (let i = 0; i < limit; i += 1) {
+    const byte = buffer[i] as number;
+    if (byte === 0 || (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13)) count += 1;
+  }
+  return count;
 }
 
 export function isTextCandidate(basename: string, ext: string): boolean {

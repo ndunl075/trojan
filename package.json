@@ -55,6 +55,8 @@
     "pretest": "tsc -p tsconfig.test.json",
     "test": "node scripts/run-tests.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "stress": "node scripts/stress.js",
+    "fuzz": "node scripts/fuzz.js",
     "dev": "tsc -p tsconfig.json --watch"
   },
   "devDependencies": {

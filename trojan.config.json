@@ -3,6 +3,7 @@
     "src/rules/**",
     "test/**",
     "scripts/stress.js",
+    "scripts/fuzz.js",
     "README.md",
     "docs/**"
   ],

@@ -53,7 +53,7 @@ person who configured the tool.
 
 ## Detection
 
-Eighteen rules across five families.
+Nineteen rules across five families.
 
 ### Instruction manipulation
 
@@ -77,6 +77,7 @@ These defeat the one defence people assume they have: reading the diff.
 | `unicode/invisible-characters` | zero-width spaces, joiners, soft hyphens, stray BOMs |
 | `unicode/bidi-override` | Trojan Source (CVE-2021-42574) — source that renders in a different order than it parses |
 | `unicode/homoglyph` | Cyrillic and Greek lookalikes mixed into ASCII words |
+| `unicode/control-characters` | NUL and C0 control bytes, which make many tools skip the file as binary |
 
 Invisible payloads are **decoded and shown to you**, not just counted:
 

@@ -101,6 +101,14 @@ export async function scan(target: string, options: ScanOptions = {}): Promise<S
 
       if (looksBinary(buffer)) {
         filesSkipped += 1;
+        // Every file that reaches here had a text extension, so binary content
+        // is odd enough to mention. Skipping in silence is how a planted file
+        // stays unscanned without anyone noticing.
+        errors.push({
+          file: file.relativePath,
+          message:
+            'has a text extension but binary content, so it was not scanned. Check it by hand if you did not expect that.',
+        });
         continue;
       }
 

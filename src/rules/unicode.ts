@@ -339,10 +339,68 @@ export const homoglyphs: Rule = {
   },
 };
 
+/**
+ * NUL and other C0 control bytes inside a text file.
+ *
+ * These are worth their own rule because they attack the *scanner* rather than
+ * the model. Plenty of tools treat a NUL as end-of-string or as proof that a
+ * file is binary and skip it entirely, so a single planted byte can take a
+ * whole file out of review while leaving it perfectly readable to anything
+ * that reads it as UTF-8.
+ */
+export const controlCharacters: Rule = {
+  id: 'unicode/control-characters',
+  title: 'Parser-hostile control characters',
+  family: 'unicode',
+  severity: 'high',
+  description:
+    'NUL or other C0 control bytes in a text file, which make many tools treat it as binary and skip it.',
+  message:
+    'Control bytes in a text file. Many scanners and diff tools treat these as end-of-file or as proof the file is binary, so they are a cheap way to hide the rest of a file from review.',
+  scan(ctx: FileContext): RawFinding[] {
+    const findings: RawFinding[] = [];
+    let run: { start: number; codes: number[] } | null = null;
+
+    const isHostile = (cp: number): boolean =>
+      cp === 0 || (cp < 32 && cp !== 9 && cp !== 10 && cp !== 13) || cp === 0x7f;
+
+    const flush = (endIndex: number): void => {
+      if (!run) return;
+      const { start, codes } = run;
+      run = null;
+
+      const hasNul = codes.includes(0);
+      findings.push({
+        ruleId: 'unicode/control-characters',
+        index: start,
+        match: ctx.text.slice(start, endIndex),
+        severity: hasNul ? 'high' : 'medium',
+        message: hasNul
+          ? `${codes.length} control byte(s) including a NUL (${describeRun(codes.slice(0, 6))}). A NUL in a text file makes many tools stop reading or skip the file entirely.`
+          : `${codes.length} C0 control character(s) (${describeRun(codes.slice(0, 6))}) in a text file. They render as nothing and confuse tools that read the file as text.`,
+        detail: { count: codes.length, codepoints: describeRun(codes.slice(0, 20)) },
+      });
+    };
+
+    for (const { cp, index } of codePoints(ctx.text)) {
+      if (isHostile(cp)) {
+        if (!run) run = { start: index, codes: [] };
+        run.codes.push(cp);
+      } else if (run) {
+        flush(index);
+      }
+    }
+    flush(ctx.text.length);
+
+    return findings;
+  },
+};
+
 export const unicodeRules: Rule[] = [
   tagCharacters,
   variationSelectors,
   invisibleCharacters,
   bidiControls,
   homoglyphs,
+  controlCharacters,
 ];

@@ -64,3 +64,34 @@ jobs:
 
       - name: Verify the clean corpus stays silent
         run: node dist/cli.js test/fixtures/clean --no-config --severity info --fail-on info
+
+  robustness:
+    name: stress and fuzz
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # This tool reads attacker-controlled text by definition, so a crafted
+      # file must not be able to hang it or take a detector offline. Budgets
+      # here are deliberately loose (250ms/input) so a busy shared runner does
+      # not produce a flaky red build -- the bugs these caught were 10s+, three
+      # orders of magnitude clear of the threshold.
+      - name: Stress (near-miss and pathological inputs)
+        run: npm run stress
+
+      # Several seeds, since each explores a different part of the space.
+      - name: Fuzz (invariant checks over random input)
+        run: |
+          for seed in 1 42 1337 99991; do
+            echo "--- seed $seed"
+            node scripts/fuzz.js 15000 "$seed"
+          done
