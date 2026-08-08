@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is in the matrix on purpose: path separators and CRLF are
+        # where a file-walking tool actually breaks.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['18', '20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  self-scan:
+    name: scan this repo with itself
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # Dogfooding. If trojan cannot keep its own repository clean, the
+      # false-positive rate is not good enough to ask anyone else to run it.
+      - name: Scan
+        run: node dist/cli.js . --fail-on high
+
+      - name: Verify the fixtures still trip the detectors
+        run: |
+          if node dist/cli.js test/fixtures/malicious --no-config --quiet; then
+            echo "::error::malicious fixtures no longer produce findings"
+            exit 1
+          fi
+          echo "malicious fixtures still detected"
+
+      - name: Verify the clean corpus stays silent
+        run: node dist/cli.js test/fixtures/clean --no-config --severity info --fail-on info
