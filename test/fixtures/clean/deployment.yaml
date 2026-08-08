@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cache-admin
+subjects:
+  - kind: Group
+    name: system:masters
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: system:controller:node-controller
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cache-config
+data:
+  # System: production cluster. Owned by the platform team.
+  prompt: "Refill cache?"
+  assistant: "disabled"
+  system.timezone: "UTC"
+  log.level: "info"

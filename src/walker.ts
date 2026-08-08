@@ -93,10 +93,20 @@ export const TEXT_FILENAMES = new Set([
 ]);
 
 export interface WalkOptions {
-  /** Extra exclude patterns from config or `--exclude`. */
+  /** Extra exclude patterns, relative to the scan root. */
   exclude?: string[];
   /** When set, only files matching one of these patterns are scanned. */
   include?: string[];
+  /**
+   * Patterns from a config file, which are relative to the directory holding
+   * that file rather than to the scan root. Without this distinction,
+   * `"exclude": ["test/fixtures/**"]` in a repo-root config would stop
+   * matching the moment someone scanned a subdirectory.
+   */
+  scopedExclude?: string[];
+  scopedInclude?: string[];
+  /** The scan root's path relative to the config directory, forward slashes. */
+  patternBase?: string;
   /** Skip the built-in exclude list. Rarely what you want. */
   noDefaultExcludes?: boolean;
   /** Honour .gitignore files found along the way. Default true. */
@@ -161,6 +171,9 @@ export async function walk(root: string, options: WalkOptions = {}): Promise<Wal
   const {
     exclude = [],
     include = [],
+    scopedExclude = [],
+    scopedInclude = [],
+    patternBase = '',
     noDefaultExcludes = false,
     respectGitignore = true,
     maxFileSize = DEFAULT_MAX_FILE_SIZE,
@@ -186,6 +199,10 @@ export async function walk(root: string, options: WalkOptions = {}): Promise<Wal
 
   const baseExcludes = new PatternSet(noDefaultExcludes ? [] : DEFAULT_EXCLUDES).add(exclude);
   const includeSet = include.length > 0 ? new PatternSet(include) : null;
+  const scopedExcludeSet = scopedExclude.length > 0 ? new PatternSet(scopedExclude) : null;
+  const scopedIncludeSet = scopedInclude.length > 0 ? new PatternSet(scopedInclude) : null;
+  const scoped = (relativePath: string): string =>
+    patternBase ? `${patternBase}/${relativePath}` : relativePath;
   const seenRealPaths = new Set<string>();
 
   interface Frame {
@@ -238,6 +255,10 @@ export async function walk(root: string, options: WalkOptions = {}): Promise<Wal
         skipped += 1;
         continue;
       }
+      if (scopedExcludeSet?.matches(scoped(relativePath), isDirectory)) {
+        skipped += 1;
+        continue;
+      }
       if (isIgnored(ignores, relativePath, isDirectory)) {
         skipped += 1;
         continue;
@@ -264,6 +285,10 @@ export async function walk(root: string, options: WalkOptions = {}): Promise<Wal
         continue;
       }
       if (includeSet && !includeSet.matches(relativePath, false)) {
+        skipped += 1;
+        continue;
+      }
+      if (scopedIncludeSet && !scopedIncludeSet.matches(scoped(relativePath), false)) {
         skipped += 1;
         continue;
       }

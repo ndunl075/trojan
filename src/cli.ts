@@ -38,6 +38,9 @@ interface CliOptions {
   failOn: Severity | 'never';
   exclude: string[];
   include: string[];
+  /** Globs from a config file, resolved against the config's directory. */
+  scopedExclude: string[];
+  scopedInclude: string[];
   rules: string[];
   disableRules: string[];
   allow: string[];
@@ -51,6 +54,7 @@ interface CliOptions {
   maxFindings: number;
   concurrency: number | undefined;
   noBoost: boolean;
+  useConfig: boolean;
   quiet: boolean;
   output: string | null;
 }
@@ -90,6 +94,7 @@ OPTIONS
       --no-color            disable ANSI colour
       --no-gitignore        do not honour .gitignore files
       --no-boost            do not raise severity for correlated findings
+      --no-config           ignore any trojan.config.json found on disk
       --follow-symlinks     follow symbolic links while walking
       --max-file-size <kb>  skip files larger than this                  (2048)
       --max-findings <n>    stop reporting after n findings
@@ -154,8 +159,19 @@ async function run(cli: CliOptions, argv: string[]): Promise<number> {
   }
 
   const configDir = stat.isDirectory() ? targetPath : path.dirname(targetPath);
-  const { config } = await loadConfig(configDir);
+  const { config, path: configPath } = cli.useConfig
+    ? await loadConfig(configDir)
+    : { config: {}, path: null };
   const merged = mergeConfig(cli, config, argv);
+
+  // A config file's globs are written relative to the file, not to whatever
+  // directory happens to be scanned, so `"exclude": ["test/**"]` in a repo-root
+  // config keeps working when someone scans a single subdirectory.
+  const configRoot = configPath ? path.dirname(configPath) : configDir;
+  const relativeToConfig = path.relative(configRoot, targetPath);
+  const patternBase = relativeToConfig.startsWith('..')
+    ? ''
+    : relativeToConfig.split(path.sep).join('/');
 
   const baselinePath = merged.baseline
     ? path.resolve(merged.baseline)
@@ -167,6 +183,9 @@ async function run(cli: CliOptions, argv: string[]): Promise<number> {
   const scanOptions: ScanOptions = {
     exclude: merged.exclude,
     include: merged.include,
+    scopedExclude: merged.scopedExclude,
+    scopedInclude: merged.scopedInclude,
+    patternBase,
     respectGitignore: merged.gitignore,
     followSymlinks: merged.followSymlinks,
     minSeverity: merged.severity,
@@ -245,8 +264,8 @@ function mergeConfig(cli: CliOptions, config: TrojanConfig, argv: string[]): Cli
 
   const merged: CliOptions = { ...cli };
 
-  if (config.exclude) merged.exclude = [...config.exclude, ...cli.exclude];
-  if (config.include) merged.include = [...config.include, ...cli.include];
+  if (config.exclude) merged.scopedExclude = [...cli.scopedExclude, ...config.exclude];
+  if (config.include) merged.scopedInclude = [...cli.scopedInclude, ...config.include];
   if (config.allow) merged.allow = [...config.allow, ...cli.allow];
   if (config.rules && !given('--rules')) merged.rules = config.rules;
   if (config.disableRules) merged.disableRules = [...config.disableRules, ...cli.disableRules];
@@ -280,6 +299,8 @@ export function parseArgs(argv: string[]): {
     failOn: 'high',
     exclude: [],
     include: [],
+    scopedExclude: [],
+    scopedInclude: [],
     rules: [],
     disableRules: [],
     allow: [],
@@ -293,6 +314,7 @@ export function parseArgs(argv: string[]): {
     maxFindings: 0,
     concurrency: undefined,
     noBoost: false,
+    useConfig: true,
     quiet: false,
     output: null,
   };
@@ -420,6 +442,9 @@ export function parseArgs(argv: string[]): {
         break;
       case '--no-boost':
         options.noBoost = true;
+        break;
+      case '--no-config':
+        options.useConfig = false;
         break;
       case '--follow-symlinks':
         options.followSymlinks = true;

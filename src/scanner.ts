@@ -18,7 +18,12 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 
 import { AllowList, Baseline, isInlineIgnored, parseInlineIgnores } from './baseline';
-import { findProseSpans, isAgentInstructionFile, makeProseLookup } from './prose';
+import {
+  findProseSpans,
+  isAgentInstructionFile,
+  makeProseLookup,
+  normalizeComments,
+} from './prose';
 import { selectRules, type RuleSelection } from './rules';
 import {
   bumpSeverity,
@@ -163,12 +168,17 @@ export function scanText(
   const lookup = makeProseLookup(prose);
   const isDocument = prose.length === 1 && prose[0]?.kind === 'document';
 
+  // Rules see a version with continuation markers blanked out, so a phrase
+  // split across several `//` lines still matches. The substitution preserves
+  // length, so every offset a rule reports still indexes the original text.
+  const ruleText = normalizeComments(text, prose);
+
   const ctx: FileContext = {
     path: posixPath,
     absolutePath,
     ext,
     basename,
-    text,
+    text: ruleText,
     prose,
     isDocument,
     isAgentInstructionFile: isAgentInstructionFile(posixPath),

@@ -243,7 +243,7 @@ export function findProseSpans(text: string, basename: string, ext: string): Pro
       if (opener.kind === 'line') {
         const newline = text.indexOf('\n', contentStart);
         const end = newline === -1 ? length : newline;
-        push(spans, contentStart, end, 'comment');
+        push(spans, text, contentStart, end, 'comment');
         i = end;
         continue outer;
       }
@@ -251,7 +251,7 @@ export function findProseSpans(text: string, basename: string, ext: string): Pro
       if (opener.kind === 'block') {
         const close = text.indexOf(opener.close, contentStart);
         const end = close === -1 ? length : close;
-        push(spans, contentStart, end, 'comment');
+        push(spans, text, contentStart, end, 'comment');
         i = close === -1 ? length : close + opener.close.length;
         continue outer;
       }
@@ -260,7 +260,7 @@ export function findProseSpans(text: string, basename: string, ext: string): Pro
       const rule = (opener as { rule: StringRule }).rule;
       const end = findStringEnd(text, contentStart, rule);
       if (rule.prose && end.contentEnd > contentStart) {
-        push(spans, contentStart, end.contentEnd, 'string');
+        push(spans, text, contentStart, end.contentEnd, 'string');
       }
       i = end.next;
       continue outer;
@@ -298,15 +298,66 @@ function findStringEnd(
   return { contentEnd: text.length, next: text.length };
 }
 
-function push(spans: ProseSpan[], start: number, end: number, kind: ProseSpan['kind']): void {
+/**
+ * A run of consecutive `//` lines is one comment as far as a reader -- or a
+ * model -- is concerned, so we merge them. Two spans join when the text
+ * between them is nothing but the newline and the next comment opener; an
+ * injection split across four comment lines has to be matched as one string.
+ */
+const COMMENT_GAP_RE = /^[^\S\n]*\n?[^\S\n]*(?:\/\/|#+|--|;+|%|\*|REM|::)?[^\S\n]*$/;
+
+function push(
+  spans: ProseSpan[],
+  text: string,
+  start: number,
+  end: number,
+  kind: ProseSpan['kind'],
+): void {
   if (end <= start) return;
   const last = spans[spans.length - 1];
-  // Merge runs like consecutive `//` lines separated only by whitespace.
-  if (last && last.kind === kind && start - last.end <= 2) {
-    last.end = end;
-    return;
+
+  if (last && last.kind === kind && start >= last.end) {
+    const gap = text.slice(last.end, start);
+    const mergeable = kind === 'comment' ? COMMENT_GAP_RE.test(gap) : gap.length === 0;
+    if (mergeable) {
+      last.end = end;
+      return;
+    }
   }
+
   spans.push({ start, end, kind });
+}
+
+/**
+ * Blank out the comment openers that continue a comment onto the next line.
+ *
+ * An injection split across four `//` lines is one instruction to a model but
+ * four fragments to a regex. Replacing the leading `//`, `#`, `*` or `--` of
+ * each continuation line with spaces of the *same length* lets a pattern match
+ * straight through it, while leaving every character offset -- and therefore
+ * every reported line number -- exactly where it was.
+ *
+ * Newlines are deliberately preserved so line-anchored patterns still work.
+ */
+const CONTINUATION_RE = /(\n[^\S\n]*)(\/\/+|#+|--+|;+|\*+|>+|%)/g;
+
+export function normalizeComments(text: string, spans: ProseSpan[]): string {
+  const commentSpans = spans.filter((span) => span.kind === 'comment');
+  if (commentSpans.length === 0) return text;
+
+  let out = text;
+  for (const span of commentSpans) {
+    const slice = out.slice(span.start, span.end);
+    if (!slice.includes('\n')) continue;
+
+    const rewritten = slice.replace(
+      CONTINUATION_RE,
+      (_full, lead: string, marker: string) => `${lead}${' '.repeat(marker.length)}`,
+    );
+    out = out.slice(0, span.start) + rewritten + out.slice(span.end);
+  }
+
+  return out;
 }
 
 /** Binary search over the sorted, non-overlapping span list. */

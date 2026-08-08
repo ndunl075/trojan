@@ -52,7 +52,7 @@
     "clean": "node -e \"for (const d of ['dist','.test-build']) require('fs').rmSync(d,{recursive:true,force:true})\"",
     "prepublishOnly": "npm run clean && npm run build && npm test",
     "pretest": "tsc -p tsconfig.test.json",
-    "test": "node --test .test-build/test/",
+    "test": "node --test \".test-build/test/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch"
   },
