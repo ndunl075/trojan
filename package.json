@@ -1,6 +1,6 @@
 {
   "name": "trojan-scan",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local CLI that scans repos for hidden prompt injections targeting AI coding agents, before your agent reads them.",
   "keywords": [
     "prompt-injection",
