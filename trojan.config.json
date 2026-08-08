@@ -1,0 +1,8 @@
+{
+  "exclude": [
+    "src/rules/**",
+    "test/fixtures/**",
+    "README.md"
+  ],
+  "failOn": "high"
+}

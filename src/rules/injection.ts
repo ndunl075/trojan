@@ -144,7 +144,9 @@ export const trustAssertion: Rule = patternRule({
       re: /\bthis\s+(?:code|file|script|package|module|function|payload|content|snippet|change)\s+(?:is|has\s+been)\s+(?:completely\s+|totally\s+|fully\s+|already\s+|100%\s+)?(?:safe|legit|legitimate|trusted|trustworthy|verified|validated|audited|approved|benign|harmless|clean|secure|tested)\b/gi,
     },
     {
-      re: /\bdo\s+not\s+(?:flag|report|warn|alert|mention|comment\s+on|raise|surface|highlight)\b/gi,
+      // An object is required. A bare "do not raise" or "do not report" shows
+      // up in ordinary help text; "do not flag this" does not.
+      re: /\b(?:do\s+not|don'?t|never)\s+(?:flag|report|warn\s+about|alert|mention|surface|highlight|disclose)\s+(?:this|it|that|these|any|anything|the\s+\w+|to\s+the\s+(?:user|human|developer))\b/gi,
       message:
         'A direct instruction not to report something. Legitimate documentation asks readers to notice things, never to stay quiet about them.',
     },
